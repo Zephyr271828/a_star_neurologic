@@ -41,6 +41,7 @@ def get_init_candidate(constraints_list, beam_size, add_space=False):
 
         for r in [x for x in keywords if x in character]:
             role.extend(add_article(r))
+        # add_article() works to add "The" "An" "A" in front of nouns
         inits = (role + common)[:beam_size]
 
         if add_space:

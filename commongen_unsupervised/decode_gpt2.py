@@ -10,6 +10,11 @@ from os import path
 from itertools import islice
 from transformers import AutoTokenizer, AutoModelWithLMHead
 
+from pprint import pprint
+
+import sys
+sys.path.append('..')
+
 from commongen_unsupervised.init_beam import get_init_candidate
 from commongen_unsupervised.generate import generate
 from commongen_supervised.utils import tokenize_constraints
@@ -57,7 +62,7 @@ def main():
                         help="whether use sampling for looking ahead")
 
     args = parser.parse_args()
-    print(args)
+    pprint(args)
 
     print(f"Decoding with: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
@@ -83,14 +88,19 @@ def main():
                     cons.append([f' {c}' for c in concept if c.islower()])
                 cons_list.append(cons)
         return cons_list
+    # return the constraints in the form of a 3-d list
 
     constraints_list = read_constraints(args.constraint_file)
     key_constraints_list = read_constraints(args.key_constraint_file)
+    # given c.islower() is included in the read_constraints() function, I feel the key_constraint_file alone is sufficient
 
     beam_inits = get_init_candidate(constraints_list, beam_size=args.beam_size, add_space=False)
+    #print(beam_inits)
+    # Add "the""a""an" to all the role-like constraints
     init_factor = [len(x) for x in beam_inits]
 
     input_lines = [y for x in beam_inits for y in x]
+    pprint(input_lines)
     input_lines = [tokenizer.convert_tokens_to_ids(tokenizer.tokenize(x)) for x in input_lines]
 
     def expand_factor(items, factors):

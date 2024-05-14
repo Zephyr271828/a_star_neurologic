@@ -1,0 +1,4 @@
+[['Cain', 'cain', 'Cains', 'cains'], ['Couple', 'couple', 'Couples', 'couples'], ['Strolls', 'strolls', 'stroll', 'Stroll'], ['Take', 'taking', 'Taking', 'take', 'takes', 'taken'], ['Use', 'using', 'use', 'Using', 'uses']]
+{"sentence": "The couple was taken to the hospital after the incident, and police believe the man may have been attempting to use a strollie, or a small, plastic,", "score": -39.22004699707031, "sum_logprob": -78.44009399414062}
+[['Cain', 'cain', 'Cains', 'cains'], ['Couple', 'couple', 'Couples', 'couples'], ['Strolls', 'strolls', 'stroll', 'Stroll'], ['Take', 'taking', 'Taking', 'take', 'takes', 'taken'], ['Use', 'using', 'use', 'Using', 'uses']]
+{"sentence": "The kids take strolls around the park, and a couple of times they have to use the restroom.", "score": -26.23925729607565, "sum_logprob": -48.238677978515625}

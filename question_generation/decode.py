@@ -8,7 +8,12 @@ from tqdm import tqdm
 from pathlib import Path
 from os import path
 from itertools import islice
-from transformers import AutoTokenizer, AutoModelWithLMHead
+from transformers import AutoTokenizer, AutoModelWithLMHead, AutoModelForCausalLM
+
+import sys
+sys.path.append('..')
+
+from pprint import pprint
 
 from question_generation.generate import generate
 from commongen_supervised.utils import tokenize_constraints
@@ -16,6 +21,7 @@ from question_generation.lexical_constraints import init_batch
 
 logger = logging.getLogger(__name__)
 
+print(torch.cuda.is_available())
 
 def main():
     parser = argparse.ArgumentParser()
@@ -59,7 +65,8 @@ def main():
 
     print(f"Decoding with: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-    model = AutoModelWithLMHead.from_pretrained(args.model_name)
+    # model = AutoModelWithLMHead.from_pretrained(args.model_name)
+    model = AutoModelForCausalLM.from_pretrained(args.model_name)
 
     torch.cuda.empty_cache()
     model.eval()
@@ -89,6 +96,8 @@ def main():
     init_factor = [len(x) for x in beam_inits]
 
     input_lines = [y for x in beam_inits for y in x]
+    # pprint(input_lines[:9])
+    # print(len(input_lines))
     input_lines = [tokenizer.convert_tokens_to_ids(tokenizer.tokenize(x)) for x in input_lines]
 
     def expand_factor(items, factors):
@@ -101,7 +110,9 @@ def main():
     constraints_list = expand_factor(constraints_list, init_factor)
 
     if path.exists(args.output_file):
+        # print('path exists')
         count = len(open(args.output_file, 'r').readlines())
+        # print(count)
         fout = Path(args.output_file).open("a", encoding="utf-8")
         input_lines = input_lines[count:]
         constraints_list = constraints_list[count:]
@@ -111,6 +122,7 @@ def main():
     next_i = 0
 
     logs = []
+    # print(total_batch)
     with tqdm(total=total_batch) as pbar:
         while next_i < len(input_lines):
             _chunk = input_lines[next_i:next_i + args.batch_size]
@@ -158,18 +170,22 @@ def main():
             prompt = [tokenizer.decode(x) for x in buf]
             output_sequences = [prompt[i] + tokenizer.decode(o).split(prompt[i])[-1].split('<|endoftext|>')[0].rstrip()
                                 for i, o in enumerate(outputs)]
+            # print(outputs[0][1])
 
             for hypothesis, score, sum_logprob in zip(output_sequences, scores, sum_logprobs):
                 log = json.dumps({'sentence': hypothesis.strip().replace('<|endoftext|>', ''),
                                   'score': score, 'sum_logprob': sum_logprob})
                 logs.append(log)
+                # print(log)
                 fout.write(f'{log}\n')
                 fout.flush()
 
             pbar.update(1)
+            # break
 
     logs_iter = iter(logs)
     logs_list = [list(islice(logs_iter, elem)) for elem in init_factor]
+    print(logs_list)
     logs_list = [sorted([json.loads(s) for s in log_list], key=lambda x: x['score'], reverse=True)[0]
                  for log_list in logs_list]
     selected_outputs = [x['sentence'] for x in logs_list]

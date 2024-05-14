@@ -5,6 +5,7 @@ import logging
 import math
 import numpy as np
 from typing import Iterable, List, Optional, Tuple
+from transformers import AutoTokenizer
 
 from question_generation.topK import topk_huggingface, ConstrainedHypothesis
 
@@ -537,6 +538,7 @@ def _generate_beam_search(
             )  # (batch_size, num_beams * vocab_size)
 
             next_scores, next_tokens = torch.topk(full_scores, 2 * num_beams, dim=1, largest=True, sorted=True)
+            # print(next_scores, next_tokens)
 
             # prepare look ahead input
             assert self._use_cache(outputs, use_cache) and use_cache, 'model not using past'
@@ -595,6 +597,8 @@ def _generate_beam_search(
             # next sentence beam content
             next_sent_beam = []
 
+            print(batch_size)
+
             # next tokens for this sentence
             for beam_token_rank, (beam_token_id, beam_token_score, constraint, num_met) in enumerate(
                 zip(next_tokens[batch_idx], next_scores[batch_idx], constraints[batch_idx], num_mets[batch_idx])
@@ -602,6 +606,9 @@ def _generate_beam_search(
                 # get beam and token IDs
                 beam_id = beam_token_id // vocab_size
                 token_id = beam_token_id % vocab_size
+                tokenizer = AutoTokenizer.from_pretrained('gpt2-large')
+                with open('individual_tokens.txt', 'a+') as f:
+                    f.write(str((tokenizer.decode([token_id]), beam_token_score)) + '\n')
 
                 effective_beam_id = batch_idx * num_beams + beam_id
                 sentence_end = token_id.item() in constraint.eos()
@@ -621,6 +628,9 @@ def _generate_beam_search(
                 # once the beam for next step is full, don't add more tokens to it.
                 if len(next_sent_beam) == num_beams:
                     break
+
+            with open('individual_tokens.txt', 'a+') as f:
+                f.write('\n')
 
             # Check if were done so that we can save a pad step if all(done)
             done[batch_idx] = done[batch_idx] or generated_hyps[batch_idx].is_done(
@@ -716,6 +726,7 @@ def _generate_beam_search(
     # retrieve best hypotheses
     for i, hypotheses in enumerate(generated_hyps):
         #hyps = sorted(hypotheses.beams, key=lambda x: x[0], reverse=True)[:5]
+        print(hypotheses.beams)
         sorted_hyps = sorted(hypotheses.beams, key=lambda x: (x[2], x[0]), reverse=True)
         for j in range(output_num_return_sequences_per_batch):
             effective_batch_idx = output_num_return_sequences_per_batch * i + j

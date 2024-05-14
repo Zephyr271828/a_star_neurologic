@@ -9,6 +9,10 @@ from pathlib import Path
 from os import path
 from transformers import MarianTokenizer, MarianMTModel
 
+import sys
+
+sys.path.append('..')
+
 from translation.generate import generate
 from translation import utils_seq2seq
 from commongen_supervised.lexical_constraints import init_batch
