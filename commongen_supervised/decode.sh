@@ -4,10 +4,10 @@ export PYTHONPATH=/home/ximinglu/a_star_neurologic
 
 DATA_DIR='../dataset/'
 SPLIT='dev'
-MODEL_RECOVER_PATH='finetune_model/gpt2-large/checkpoint-1800/'
+MODEL_RECOVER_PATH='fine-tune_gpt2/checkpoint-14500/'
 
-DEVICES=$1
-OUTPUT_FILE=$2
+DEVICES=0
+OUTPUT_FILE=output_decode/result.txt
 
 # neurologic with greedy look-ahead
 CUDA_VISIBLE_DEVICES=${DEVICES} python decode.py --model_name ${MODEL_RECOVER_PATH} \

@@ -5,6 +5,7 @@ export PYTHONPATH=/home/ximinglu/a_star_neurologic
 DATA_DIR='../dataset/machine_translation'
 DATA_PREFIX='iate.414'
 MODEL_NAME='Helsinki-NLP/opus-mt-en-de'
+# Llama 3
 
 DEVICES=$1
 OUTPUT_FILE=$2

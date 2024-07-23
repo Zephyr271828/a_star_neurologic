@@ -1,0 +1,14 @@
+python run_clm.py \
+    --model_name_or_path gpt2\
+    --train_file ../dataset/commongen/train.txt \
+    --validation_file  ../dataset/commongen/dev.txt\
+    --per_device_train_batch_size 8 \
+    --per_device_eval_batch_size 8 \
+    --do_train True \
+    --do_eval True \
+    --output_dir fine-tuned_gpt2 \
+    --overwrite_output_dir \
+    --evaluation_strategy steps \
+    --eval_steps 50 \
+    --logging_steps 1 \
+    --save_safetensors False

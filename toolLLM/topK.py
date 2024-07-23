@@ -9,8 +9,8 @@ import transformers
 import sys
 sys.path.append('..')
 
-from commongen_supervised.lexical_constraints import ConstrainedHypothesis, ConstrainedCandidate
-from commongen_supervised.look_ahead import _generate_beam_search, _generate_greedy, _generate_sample
+from toolLLM.lexical_constraints import ConstrainedHypothesis, ConstrainedCandidate
+from toolLLM.look_ahead import _generate_beam_search, _generate_greedy, _generate_sample
 
 
 def _reorder_cache(past: Tuple, beam_idx: torch.Tensor) -> Tuple[torch.Tensor]:

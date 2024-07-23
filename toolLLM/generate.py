@@ -9,7 +9,7 @@ from typing import Iterable, List, Optional, Tuple
 import sys
 sys.path.append('..')
 
-from commongen_supervised.topK import topk_huggingface, ConstrainedHypothesis
+from toolLLM.topK import topk_huggingface, ConstrainedHypothesis
 
 
 logger = logging.getLogger(__name__)
@@ -499,6 +499,8 @@ def _generate_beam_search(
     # history of token score
     score_history = None
 
+    # import pdb;pdb.set_trace()
+
     while cur_len < max_length:
         model_inputs = self.prepare_inputs_for_generation(
             input_ids, past=past, attention_mask=attention_mask, use_cache=use_cache, **model_specific_kwargs
@@ -710,6 +712,7 @@ def _generate_beam_search(
         if done[batch_idx]:
             continue
 
+        # import pdb; pdb.set_trace()
         # test that beam scores match previously calculated scores if not eos and batch_idx not done
         if eos_token_id is not None and all(
             (token_id % vocab_size).item() not in cons_eos for token_id in next_tokens[batch_idx]
