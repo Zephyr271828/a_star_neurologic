@@ -22,7 +22,6 @@ from commongen_supervised.lexical_constraints import init_batch
 
 logger = logging.getLogger(__name__)
 
-
 def main():
     parser = argparse.ArgumentParser()
 

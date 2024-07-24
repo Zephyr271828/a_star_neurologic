@@ -76,6 +76,7 @@ def main():
 
     print(f"Decoding with: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    tokenizer.pad_token = tokenizer.eos_token
     # model = AutoModelWithLMHead.from_pretrained(args.model_name)
     model = AutoModelForCausalLM.from_pretrained(args.model_name)
 
@@ -87,10 +88,11 @@ def main():
     # period_id = [tokenizer.convert_tokens_to_ids('.')]
     # period_id.append(tokenizer.convert_tokens_to_ids('Ġ.'))
     # eos_ids = [tokenizer.eos_token_id] + period_id
-    PAD_ID = tokenizer.convert_tokens_to_ids('<pad>')
+    PAD_ID = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
+    eos_ids = [tokenizer.convert_tokens_to_ids(tokenizer.eos_token)]
     # PAD_ID = tokenizer.pad_token_id
     # PAD_ID = 0
-    print('PAD ID:', PAD_ID)
+    # print('PAD ID:', PAD_ID)
 
     with open(args.input_path) as fin:
         # input_lines = [line.split('=')[0] + "=" for line in fin.read().splitlines()]
@@ -115,34 +117,35 @@ def main():
     # both files contain variations of the given word
     # key_constraints_list is case-insenstive, whereas constraints_list is case-sensitive
 
-    # print(input_lines[0])
-    # print(constraints_list[0])
-    # input_lines = [tokenizer.convert_tokens_to_ids(tokenizer.tokenize(x)) for x in input_lines]
-    input_lines = [tokenizer(x, padding = True, truncation = True) for x in input_lines]
+    input_lines = tokenizer(
+        input_lines, 
+        padding = True, 
+        truncation = True, 
+        max_length = 77, 
+        return_tensors='pt'
+    )
     constraints_list = tokenize_constraints(tokenizer, constraints_list)
     key_constraints_list = tokenize_constraints(tokenizer, key_constraints_list)
     # tokenize inputs and constraints
-
-    print(input_lines[0])
-    print()
+    print(input_lines['input_ids'][0])
+    print(input_lines['attention_mask'][0])
 
     if path.exists(args.output_file):
-        count = len(open(args.output_file, 'r').readlines())
+        # count = len(open(args.output_file, 'r').readlines())
         fout = Path(args.output_file).open("a", encoding="utf-8")
-        input_lines = input_lines[count:]
-        constraints_list = constraints_list[count:]
-        key_constraints_list = key_constraints_list[count:]
+        # input_lines = input_lines[count:]
+        # constraints_list = constraints_list[count:]
+        # key_constraints_list = key_constraints_list[count:]
     else:
         fout = Path(args.output_file).open("w", encoding="utf-8")
-    total_batch = math.ceil(len(input_lines) / args.batch_size)
+    total_batch = math.ceil(len(input_lines['input_ids']) / args.batch_size)
     next_i = 0
     # output file directory
     # if output already exists, append, otherwise write
 
     with tqdm(total=total_batch) as pbar:
-        while next_i < len(input_lines):
+        while next_i < len(input_lines['input_ids']):
         # iterate over the batches
-            _chunk = input_lines[next_i:next_i + args.batch_size]
             # _chunk = [[tokenizer.bos_token_id for j in range(len(each))] for each in _chunk]
             constraints = init_batch(raw_constraints=constraints_list[next_i:next_i + args.batch_size],
                                      key_constraints=key_constraints_list[next_i:next_i + args.batch_size],
@@ -150,21 +153,14 @@ def main():
                                      eos_id=eos_ids)
             # init_batch from lexical constraints
             # effects: 
-            buf = _chunk
             next_i += args.batch_size
 
-            max_len = max([len(x) for x in buf])
-            buf = [x + [PAD_ID] * (max_len - len(x)) for x in buf]
-            # pad the sequences in the batch
-
-            input_ids = torch.stack([torch.from_numpy(np.array(x)) for x in buf])
+            input_ids = input_lines['input_ids'][next_i:next_i + args.batch_size, :]
             input_ids = input_ids.to('cuda')
-            attention_mask = (~torch.eq(input_ids, PAD_ID)).int()
-            # '~' means negation. 
-            # the parts input_id!=PAD_ID are equal to 1, otherwise 0
+            attention_mask = input_lines['attention_mask'][next_i:next_i + args.batch_size, :]
             attention_mask = attention_mask.to('cuda')
-            #print(input_ids.shape)
-            #print(attention_mask.shape)
+            print(input_ids.shape)
+            print(attention_mask.shape)
 
             outputs = generate(self=model,
                                input_ids=input_ids,
@@ -185,18 +181,16 @@ def main():
                                look_ahead_sample=args.look_ahead_sample)
             # generate from commogen.generate
             # effects:
-
-            prompt = [tokenizer.decode(x) for x in buf]
-            # print(prompt)
-            output_sequences = [tokenizer.decode(o).split('<|endoftext|>')[0].split(prompt[i])[-1].replace('=', '').strip()
-                                for i, o in enumerate(outputs)]
-            # print(output_sequences)
+            
+            output_sequences = [tokenizer.decode(o) for i, o in enumerate(outputs)]
             # after checking the output sequences, somehow only the last prompt in a batch has a corresponding sentence as output
             # while the last sentence has a weird result, with a bunch of numbers
             # need to check generate()
 
             for hypothesis in output_sequences:
-                fout.write(hypothesis.strip().replace('<|endoftext|>', '') + "\n")
+                tmp = hypothesis.strip().replace('<|endoftext|>', '')
+                print(tmp)
+                fout.write(tmp + "\n")
                 fout.flush()
                 # clear the buffer of a file
 

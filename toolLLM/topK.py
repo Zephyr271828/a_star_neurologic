@@ -188,6 +188,8 @@ def _sequential_topk(sentno: int,
         elif hypotheses[row].is_valid(col) or int(best_next[row]) == col:
             candidates.add(cand)
 
+    print('hypotheses:', [each.positive_state for each in hypotheses])
+
     hit = np.stack([best_ids, best_word_ids], axis=1).tolist()
     # For each hypothesis, we add (2) all the constraints that could follow it and
     # (3) the best item (constrained or not) in that row

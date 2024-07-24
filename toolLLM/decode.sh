@@ -24,9 +24,9 @@ CUDA_VISIBLE_DEVICES=${DEVICES} python decode.py --model_name ${MODEL_RECOVER_PA
   --input_path ${INPUT_PATH} --output_file ${OUTPUT_FILE} \
   --constraint_file ${CONSTRAINT_FILE} \
   --key_constraint_file ${CONSTRAINT_FILE} \
-  --batch_size 1 \
-  --ngram_size 3 --length_penalty 0.2 --max_tgt_length 150 \
-  --prune_factor 50 --sat_tolerance 2 \
+  --batch_size 1 --beam_size 8 --max_tgt_length 150 \
+  --ngram_size 3 --length_penalty 0.2  \
+  --prune_factor 50000 --sat_tolerance 2 \
   --look_ahead_step 5  --alpha 0.25 --look_ahead_width 1 #--fusion_t 1.0
 
 # neurologic with sampling look-ahead
