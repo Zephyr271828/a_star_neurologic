@@ -833,9 +833,11 @@ def calc_banned_ngram_tokens(prev_input_ids: Tensor, num_hypos: int, no_repeat_n
             continue
         generated_ngram = generated_ngrams[idx]
         for ngram in zip(*[gen_tokens[i:] for i in range(no_repeat_ngram_size)]):
+        # this line of code iterates over all n-grams in the sequence
             prev_ngram_tuple = tuple(ngram[:-1])
             generated_ngram[prev_ngram_tuple] = generated_ngram.get(prev_ngram_tuple, []) + [ngram[-1]]
 
+    # import pdb; pdb.set_trace()
     def _get_generated_ngrams(hypo_idx):
         # Before decoding the next token, prevent decoding of ngrams that have already appeared
         gen_tokens = [x for x in prev_input_ids[hypo_idx].tolist() if x != pad_token_id]

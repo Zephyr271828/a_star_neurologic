@@ -3,19 +3,23 @@
 import os
 
 #os.environ['TRANSFORMERS_CACHE'] = '/scratch/yx3038/cache'
-os.environ['HF_DATASETS_CACHE'] = '/scratch/yx3038/cache'
-os.environ['HF_HOME'] = '/scratch/yx3038/cache'
+# os.environ['HF_DATASETS_CACHE'] = '/scratch/yx3038/cache'
+# os.environ['HF_HOME'] = '/scratch/yx3038/cache'
 
 import json
 import math
 import argparse
 import torch
+import torch.nn as nn
 import logging
 import numpy as np
 from tqdm import tqdm
 from pathlib import Path
 from os import path
 from transformers import AutoTokenizer, AutoModelWithLMHead, AutoModelForCausalLM
+from transformers import LlamaConfig, GPT2Config
+
+# from flash_attention import FlashAttention
 
 import sys
 
@@ -30,14 +34,68 @@ from toolLLM.lexical_constraints import init_batch
 
 logger = logging.getLogger(__name__)
 
+class FlashAttention(nn.Module):
+
+    def __init__(self, hidden_size, num_attention_heads):
+        super(FlashAttention, self).__init__()
+        self.num_attention_heads = num_attention_heads
+        self.attention_head_size = hidden_size // num_attention_heads
+        self.all_head_size = self.num_attention_heads * self.attention_head_size
+
+        self.query = nn.Linear(hidden_size, self.all_head_size)
+        self.key = nn.Linear(hidden_size, self.all_head_size)
+        self.value = nn.Linear(hidden_size, self.all_head_size)
+        self.dense = nn.Linear(hidden_size, hidden_size)
+
+    def forward(self, hidden_states, attention_mask=None):
+        query_layer = self.query(hidden_states)
+        key_layer = self.key(hidden_states)
+        value_layer = self.value(hidden_states)
+
+        context_layer = flash_attention(query_layer, key_layer, value_layer, attention_mask)
+
+        output = self.dense(context_layer)
+        return output
+
+class GPT2WithFlashAttention(AutoModelForCausalLM):
+    def __init__(self, config):
+        super().__init__(config)
+        self.flash_attention = FlashAttention(config.hidden_size, config.num_attention_heads)
+        
+    def forward(self, input_ids, attention_mask=None, **kwargs):
+
+        embedding_output = self.wte(input_ids)
+        
+        flash_attention_output = self.flash_attention(embedding_output, attention_mask)
+        
+        outputs = self.h(flash_attention_output, attention_mask, **kwargs)
+        
+        return outputs
+
+class LLaMA3WithFlashAttention(AutoModelForCausalLM):
+    def __init__(self, config):
+        super().__init__(config)
+        self.flash_attention = FlashAttention(config.hidden_size, config.num_attention_heads)
+        
+    def forward(self, input_ids, attention_mask=None, **kwargs):
+
+        embedding_output = self.model.embed_tokens(input_ids)
+        
+        flash_attention_output = self.flash_attention(embedding_output, attention_mask)
+        
+        outputs = self.model.transformer(flash_attention_output, attention_mask, **kwargs)
+        
+        return outputs
+
 def main():
-    print(torch.cuda.is_available())
+    # print(torch.cuda.is_available())
 
     parser = argparse.ArgumentParser()
 
     parser.add_argument("--model_name", type=str, help="pretrained language model to use")
     parser.add_argument("--input_path", type=str, help="path of input file")
     parser.add_argument("--output_file", type=str, help="output file")
+    parser.add_argument("--response_file", type=str, help="response file")
     parser.add_argument("--constraint_file", type=str, help="constraint file")
     parser.add_argument("--key_constraint_file", type=str, help="key elements in constraint file")
 
@@ -77,17 +135,39 @@ def main():
     print(f"Decoding with: {args.model_name}")
     tokenizer = AutoTokenizer.from_pretrained(args.model_name)
     tokenizer.pad_token = tokenizer.eos_token
+    tokenizer.padding_side = 'left'
     # model = AutoModelWithLMHead.from_pretrained(args.model_name)
-    model = AutoModelForCausalLM.from_pretrained(args.model_name)
 
+    if torch.cuda.is_available():
+        GPU_name = torch.cuda.get_device_name(0)
+        if '100' in GPU_name:
+            # NOTE bf16 support for model
+            model = AutoModelForCausalLM.from_pretrained(
+                args.model_name, 
+                torch_dtype=torch.bfloat16,
+                attn_implementation="flash_attention_2"
+            )
+        else:
+            # NOTE fp16 support
+            model = AutoModelForCausalLM.from_pretrained(args.model_name)
+            model = model.half()
+
+
+    # NOTE add flash attention to the model
+    # if 'gpt2' in args.model_name:
+    #     # config = GPT2Config.from_pretrained(args.model_name)
+    #     # model = GPT2WithFlashAttention.from_config(config)
+    #     model = GPT2WithFlashAttention.from_pretrained(args.model_name)
+    # elif 'llama3' in args.model_name:
+    #     # config = LlamaConfig.from_pretrained(args.model_name)
+    #     # model = LLaMA3WithFlashAttention.from_config(config)
+    #     model = LLaMA3WithFlashAttention.from_pretrained(args.model_name)
+    
     torch.cuda.empty_cache()
     model.eval()
     model = model.to('cuda')
     # no training, only decoding
 
-    # period_id = [tokenizer.convert_tokens_to_ids('.')]
-    # period_id.append(tokenizer.convert_tokens_to_ids('Ġ.'))
-    # eos_ids = [tokenizer.eos_token_id] + period_id
     PAD_ID = tokenizer.convert_tokens_to_ids(tokenizer.pad_token)
     eos_ids = [tokenizer.convert_tokens_to_ids(tokenizer.eos_token)]
     # PAD_ID = tokenizer.pad_token_id
@@ -95,7 +175,6 @@ def main():
     # print('PAD ID:', PAD_ID)
 
     with open(args.input_path) as fin:
-        # input_lines = [line.split('=')[0] + "=" for line in fin.read().splitlines()]
         input_lines = [line for line in fin.read().splitlines()]
     # input lines contain the constraints before "=" only
 
@@ -114,21 +193,35 @@ def main():
 
     constraints_list = read_constraints(args.constraint_file)
     key_constraints_list = read_constraints(args.key_constraint_file)
+    flattened_list = [[each for l in lst for each in l] for lst in key_constraints_list]
+    response_list = json.load(open(args.response_file, 'r+'))
     # both files contain variations of the given word
     # key_constraints_list is case-insenstive, whereas constraints_list is case-sensitive
+    # system_message = "You are a helpful assistant and capable of answering user's queries with a list of words. Each time you are given a query, you will also have access to a list of words corresponding to the information required in the query. You need to make use of the list of words to answer the query. Try to figure out which word corresponds to which information required. Articulate them to answer the user's query well."
+    system_message = "You are a helpful assistant and capable of answering user's queries with a set of powerful functions. Each time you are given a query, you will also have access to the function's response in a dictionary form. You need to make use of the information in the function return to answer the query. Pay attention to the relevant keys and their corresponding values. Articulate them to answer the user's query well."
+
+    print(len(input_lines))
+    input_lines = [
+        f'''<|start_header_id|>system<|end_header_id|>
+        {system_message}<|eot_id|>
+        <|start_header_id|>user<|end_header_id|>
+        query: {input_lines[i]} 
+        response: {response_list[i]}<|eot_id|>
+        <|start_header_id|>assistant<|end_header_id|> ''' for i in range(len(input_lines))]
+    # input_lines = [f'query: {each}\nanswer: ' for each in input_lines]
+    print(input_lines[0])
+    print([len(each) for each in input_lines])
 
     input_lines = tokenizer(
         input_lines, 
         padding = True, 
         truncation = True, 
-        max_length = 77, 
+        max_length = 256, 
         return_tensors='pt'
     )
     constraints_list = tokenize_constraints(tokenizer, constraints_list)
     key_constraints_list = tokenize_constraints(tokenizer, key_constraints_list)
     # tokenize inputs and constraints
-    print(input_lines['input_ids'][0])
-    print(input_lines['attention_mask'][0])
 
     if path.exists(args.output_file):
         # count = len(open(args.output_file, 'r').readlines())
@@ -153,14 +246,13 @@ def main():
                                      eos_id=eos_ids)
             # init_batch from lexical constraints
             # effects: 
-            next_i += args.batch_size
 
             input_ids = input_lines['input_ids'][next_i:next_i + args.batch_size, :]
             input_ids = input_ids.to('cuda')
             attention_mask = input_lines['attention_mask'][next_i:next_i + args.batch_size, :]
             attention_mask = attention_mask.to('cuda')
-            print(input_ids.shape)
-            print(attention_mask.shape)
+            # print(input_ids.shape)
+            # print(attention_mask.shape)
 
             outputs = generate(self=model,
                                input_ids=input_ids,
@@ -187,6 +279,8 @@ def main():
             # while the last sentence has a weird result, with a bunch of numbers
             # need to check generate()
 
+            print(len(output_sequences))
+            print(output_sequences)
             for hypothesis in output_sequences:
                 tmp = hypothesis.strip().replace('<|endoftext|>', '')
                 print(tmp)
@@ -195,6 +289,9 @@ def main():
                 # clear the buffer of a file
 
             pbar.update(1)
+            next_i += args.batch_size
+
+            break
 
 if __name__ == "__main__":
     main()

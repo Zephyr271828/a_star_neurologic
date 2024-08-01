@@ -175,7 +175,9 @@ def _sequential_topk(sentno: int,
     finished_candidates = set()
     # the best item (constrained or not) in that row
     best_next = np.argmax(scores, axis=1)
+    # scores shape: beam size * vocab size
     rank = rankdata(-1 * scores, method='dense').reshape(scores.shape)
+    # import pdb; pdb.set_trace()
 
     # (1) Add all of the top-k items (which were passed) in as long as they pass the constraints
     for row, col, seq_score in zip(best_ids, best_word_ids, sequence_scores):
@@ -188,7 +190,7 @@ def _sequential_topk(sentno: int,
         elif hypotheses[row].is_valid(col) or int(best_next[row]) == col:
             candidates.add(cand)
 
-    print('hypotheses:', [each.positive_state for each in hypotheses])
+    # print('hypotheses:', [each.positive_state for each in hypotheses])
 
     hit = np.stack([best_ids, best_word_ids], axis=1).tolist()
     # For each hypothesis, we add (2) all the constraints that could follow it and
@@ -308,6 +310,7 @@ def _sequential_topk(sentno: int,
             cand.rank = cand.score / (timestep - init_length + 1)
             if future_score > -10000.0 and cand.col not in cand.hypothesis.eos():
                 cand.rank += alpha * future_score
+            # import pdb; pdb.set_trace()
         all_sorted_candidates = sorted(all_sorted_candidates, key=attrgetter('rank'), reverse=True)
 
         # Bucket candidates in each group by met order

@@ -1,12 +1,5 @@
-Retrieve the details of a fake user with a specific gender. I am looking for a female user.
-
-
-I was looking for user. I was looking. I said me me me I saw me saw me seen me saw Kay. said me, said me seen, said, said said said, saw, said it said said it all of the description, description said, description, said. said, Kayla description said description, the name said, a
-Retrieve the details of a fake user with a specific gender. I am looking for a female user.
-
-
-I was looking for user. I was looking. I said me me me I saw me saw me seen me saw Kay. said me, said me seen, said, said said said, saw, said it said said it all of the description, description said, description, said. said, Kayla description said description, the name said, a
-Retrieve the details of a fake user with a specific gender. I am looking for a female user.
-
-
-I was looking for user. I was looking. I said Kay. Kay. said. said, Kay, Kay said. Kay said, said, My, My friend, Friend, Friend of Friend of My friend said, my friend, I was in the said, I said I said and I said, and said and said. My friends,
+<|start_header_id|>system<|end_header_id|>
+        You are a helpful assistant and capable of answering user's queries with a set of powerful functions. Each time you are given a query, you will also have access to the function's response in a dictionary form. You need to make use of the information in the function return to answer the query. Pay attention to the relevant keys and their corresponding values. Articulate them to answer the user's query well.<|eot_id|>
+        <|start_header_id|>user<|end_header_id|>
+        query: Help me retrieve the name, email, and school of a user with the id "Zephyr". 
+        response: {'role': 'function', 'name': 'get_user_info_by_id', 'content': '{"error": "", "response": "{\'results\': [{\'name\': \'Yufeng Xu\', \'email\': \'yx3038@nyu.edu\', \'school\': \en\en"\en\ne\en",\en":\en'en\ena\en|"\ena"\ne"\"en\"\te\en","en\n\"en\te","te\ne\"te\te\"ne\ne'en\"te"ne\te'en"ne"en"\"ne"ne\"en" \en \en"ck\te"\de\teck\en\"de\en \te"en\"en*en"et\te \en&en"&en'et\en"><span\enet"\pt'et"et"><span"et"pt"pt":"et":"""&"&\pt\en 'en\span\p":\te":":":\span"\p"\ch":":"\be"is":\ne":",'en":"":"ne":":",":","\enn":"en":",\is"is"\es"\span"."\tr":,""\n"\se""\.":":.":\n":"".\en.":"&":\es":
